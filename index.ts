@@ -7,7 +7,7 @@ const app = Express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors:{
-        origin:["http://localhost:3000","https://admin.socket.io"],
+        origin:["http://localhost:3000","https://admin.socket.io","https://admin.socket.io/#"],
     },
 });
 
@@ -23,7 +23,10 @@ io.on("disconnect",(socket)=>{
     
 })
 
-httpServer.listen(3001);
+httpServer.listen(3001,()=>{
+    console.log("server is listening on port 3001");
+    
+});
 
 instrument(io,{
     auth:false,
