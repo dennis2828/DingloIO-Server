@@ -17,11 +17,19 @@ app.get("/",(_, res)=>{
 
 io.on("connection",(socket)=>{
     console.log("new connection", socket.id);
+    socket.on("message",(message)=>{
+        console.log("new message from client",message);
+        socket.emit("message_client",message);
+    });
 });
+
 io.on("disconnect",(socket)=>{
+    console.log("disconnect");
+    
     console.log("disconnect", socket.id);
     
-})
+});
+
 
 httpServer.listen(3001,()=>{
     console.log("server is listening on port 3001");
