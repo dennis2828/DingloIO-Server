@@ -20,11 +20,15 @@ io.on("connection",(socket)=>{
     
     if(socket.handshake.query.apiKey && socket.handshake.query.apiKey.trim()!==""){
         //client - join room
-        socket.join(socket.id);
+        const connectionId = socket.handshake.query.connectionId as string;
+        console.log("cid", connectionId);
+        
+        socket.join(connectionId);
         
         socket.on("message", (message)=>{
-            socket.to(socket.handshake.query.apiKey!).emit("DingloClient-DashboardMessage", {...message, connectionId: socket.id});
-       });
+            socket.to(socket.handshake.query.apiKey!).emit("DingloClient-DashboardMessage", {...message, connectionId});
+            socket.emit("message_client",message);
+        });
     }else{
         //dingloUser - join room api key
         console.log("dinglo user", socket.handshake.query.id);
