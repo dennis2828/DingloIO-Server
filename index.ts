@@ -22,10 +22,8 @@ io.on("connection",(socket)=>{
         //client - join room
         socket.join(socket.id);
         
-       socket.on("message", (message)=>{
-        console.log("gata");
-        
-            socket.to(socket.handshake.query.apiKey!).emit("dashboardMessage", message);
+        socket.on("message", (message)=>{
+            socket.to(socket.handshake.query.apiKey!).emit("DingloClient-DashboardMessage", {...message, connectionId: socket.id});
        });
     }else{
         //dingloUser - join room api key
@@ -33,9 +31,9 @@ io.on("connection",(socket)=>{
         
         socket.join(socket.handshake.query.id!);
         
-        socket.on("dashboardMessage",(message)=>{
-            console.log("message de la client");
-            
+        socket.on("DingloServer-DashboardMessage",(msg)=>{
+            console.log("message de la client", msg);
+            socket.to(msg.connectionId).emit("message_client",msg);
         })
     }
     
