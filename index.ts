@@ -17,7 +17,7 @@ app.get("/",(_, res)=>{
 
 io.on("connection",(socket)=>{
     console.log("new connection", socket.id, socket.handshake.query);
-    
+    //@ts-ignore to solve .trim()
     if(socket.handshake.query.apiKey && socket.handshake.query.apiKey.trim()!==""){
         //client - join room
         const connectionId = socket.handshake.query.connectionId as string;
