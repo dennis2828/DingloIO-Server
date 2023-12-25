@@ -1,6 +1,6 @@
 import Express from "express";
 import {createServer} from "http";
-import {Server} from "socket.io";
+import {Server, Socket} from "socket.io";
 import { instrument } from "@socket.io/admin-ui";
 import db from "./db";
 
@@ -61,6 +61,26 @@ async function saveMessage(message: string, connectionId: string, apiKey: string
    }
 }
 
+async function getConnectionMessages(connectionId: string){
+    const messages = await db.message.findMany({
+        where:{
+            conversationId: connectionId,
+        },
+    });
+
+    if(!messages) return [];
+
+    return messages;
+}
+
+async function sendConnectionMessages(connectionId: string, socket: Socket){
+    const connectionMessages = await getConnectionMessages(connectionId);
+
+    for(const cn of connectionMessages){
+        socket.emit("message_client",{isAgent: cn.isAgent, message: cn.message, messagedAt: cn.messagedAt});
+    }
+}
+
 io.on("connection",(socket)=>{
     console.log("new connection", socket.id, socket.handshake.query);
     //@ts-ignore to solve .trim()
@@ -71,6 +91,12 @@ io.on("connection",(socket)=>{
         
         socket.join(connectionId);
         
+        //send the previous messages
+        setTimeout(()=>{
+            // give some to socket to initialize
+            sendConnectionMessages(connectionId, socket);
+        },500);
+
         socket.on("message", (message)=>{
             //save message to db
             saveMessage(message.message,connectionId,socket.handshake.query.apiKey as string,false);
@@ -86,7 +112,7 @@ io.on("connection",(socket)=>{
         socket.on("DingloServer-DashboardMessage",(msg)=>{
             saveMessage(msg.message,msg.connectionId,socket.handshake.query.id as string,true);
             socket.to(msg.connectionId).emit("message_client",msg);
-        })
+        });
     }
     
 });
