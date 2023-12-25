@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,31 +10,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Project {
-  id          String @id
-  projectName String
-  password    String
-  api_key     String
-  userId      String
-  User        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model User {
-  id            String    @id
-  username      String    @unique
-  email         String    @unique
-  password      String?
-  provider      PROVIDERS @default(EMAIL)
-  isInvited     Boolean   @default(false)
-  invitedBy     String?
-  invitations   String[]
-  uniqueFeature Boolean   @default(false)
-  newsletter    String?
-  Project       Project[]
-}
 
 enum PROVIDERS {
   EMAIL
   GOOGLE
   GITHUB
+}
+
+model User {
+  id String @id @default(uuid())
+  username String @unique
+  email String @unique
+  password String?
+  provider PROVIDERS @default(EMAIL)
+  isInvited Boolean @default(false)
+  invitedBy String?
+  invitations String[]
+  uniqueFeature Boolean @default(false)
+  newsletter String?
+
+  projects Project[]
+}
+
+model Project {
+  id String @id @default(uuid())
+  projectName String
+  password String
+  api_key String @unique
+  conversations Conversation[]
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+}
+
+model Conversation {
+  connectionId String @unique
+  messages Message[]
+
+
+  projectId String
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([connectionId])
+}
+
+model Message{
+  id String @id @default(uuid())
+  message String
+  isAgent Boolean
+  messagedAt String
+
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [connectionId], onDelete: Cascade)
+
 }
