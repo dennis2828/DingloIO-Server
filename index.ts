@@ -109,6 +109,33 @@ async function createConversation(connectionId: string, projectApiKey: string){
     }
 }
 
+async function agentStatus(projectApiKey: string, socket: Socket, available: boolean){
+    try{
+        const targetProject = await db.project.findUnique({
+            where:{
+                api_key: projectApiKey,
+            },
+        });
+
+        if(!targetProject) return;
+
+        //emit to all conversations that there is an available agent
+        const projectConversations = await db.conversation.findMany({
+            where:{
+                projectId: targetProject.id,
+            },
+        });
+
+        if(projectConversations)
+            for(const conv of projectConversations){
+                socket.to(conv.connectionId).emit("available_agent",available);
+            }
+    }catch(err){
+        console.log(err);
+    }
+}
+
+
 io.on("connection",(socket)=>{
     console.log("new connection", socket.id, socket.handshake.query);
     //@ts-ignore to solve .trim()
@@ -129,6 +156,14 @@ io.on("connection",(socket)=>{
         createConversation(connectionId, socket.handshake.query.apiKey as string);
         socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection",connectionId);
 
+        console.log(io.sockets.adapter.rooms.has(socket.handshake.query.apiKey as string));
+        
+        //online/offline agent
+        const isAvailableAgent = io.sockets.adapter.rooms.has(socket.handshake.query.apiKey as string);
+        setTimeout(()=>{
+            socket.emit("available_agent",isAvailableAgent);
+        },500);
+
         socket.on("message", (message)=>{
             //save message to db
             saveMessage(message.message,connectionId,socket.handshake.query.apiKey as string,false);
@@ -139,10 +174,17 @@ io.on("connection",(socket)=>{
         console.log("dinglo user", socket.handshake.query.id);
         
         socket.join(socket.handshake.query.id!);
-        
+
+        //emit being online
+        agentStatus(socket.handshake.query.id as string, socket, true);
+
         socket.on("DingloServer-DashboardMessage",(msg)=>{
             saveMessage(msg.message,msg.connectionId,socket.handshake.query.id as string,true);
             socket.to(msg.connectionId).emit("message_client",msg);
+        });
+        socket.on("disconnect",()=>{
+            console.log("disconnect");
+            agentStatus(socket.handshake.query.id as string, socket, false);
         });
     }
     
@@ -150,9 +192,10 @@ io.on("connection",(socket)=>{
 
 io.on("disconnect",(socket)=>{
     console.log("disconnect");
-    
+    if(socket.handshake.query.id)
+        agentStatus(socket.handshake.query.id as string, socket, false);
+
     console.log("disconnect", socket.id);
-    
 });
 
 
