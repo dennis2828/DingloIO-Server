@@ -81,6 +81,34 @@ async function sendConnectionMessages(connectionId: string, socket: Socket){
     }
 }
 
+async function createConversation(connectionId: string, projectApiKey: string){
+    try{
+        const targetProject = await db.project.findUnique({
+            where:{
+                api_key: projectApiKey,
+            },
+        });
+        if(!targetProject) return;
+
+        //check already exists
+        const alreadyExists = await db.conversation.findUnique({
+            where:{
+                connectionId,
+            },
+        });
+        if(!alreadyExists)
+            await db.conversation.create({
+                data:{
+                    connectionId: connectionId,
+                    projectId: targetProject.id,
+                },
+            });
+
+    }catch(err){
+        console.log(err);
+    }
+}
+
 io.on("connection",(socket)=>{
     console.log("new connection", socket.id, socket.handshake.query);
     //@ts-ignore to solve .trim()
@@ -96,6 +124,10 @@ io.on("connection",(socket)=>{
             // give some to socket to initialize
             sendConnectionMessages(connectionId, socket);
         },500);
+
+        //emit to dashboard new connection
+        createConversation(connectionId, socket.handshake.query.apiKey as string);
+        socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection",connectionId);
 
         socket.on("message", (message)=>{
             //save message to db
