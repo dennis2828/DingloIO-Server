@@ -133,7 +133,6 @@ io.on("connection",(socket)=>{
             //save message to db
             saveMessage(message.message,connectionId,socket.handshake.query.apiKey as string,false);
             socket.to(socket.handshake.query.apiKey!).emit("DingloClient-DashboardMessage", {...message, connectionId});
-            socket.emit("message_client",message);
         });
     }else{
         //dingloUser - join room api key
