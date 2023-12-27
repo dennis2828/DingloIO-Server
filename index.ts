@@ -77,7 +77,7 @@ async function sendConnectionMessages(connectionId: string, socket: Socket){
     const connectionMessages = await getConnectionMessages(connectionId);
 
     for(const cn of connectionMessages){
-        socket.emit("message_client",{isAgent: cn.isAgent, message: cn.message, messagedAt: cn.messagedAt});
+        socket.emit("message_client",{isAgent: cn.isAgent, message: cn.message, messagedAt: cn.messagedAt, isNew: false});
     }
 }
 
@@ -156,8 +156,6 @@ io.on("connection",(socket)=>{
         createConversation(connectionId, socket.handshake.query.apiKey as string);
         socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection",connectionId);
 
-        console.log(io.sockets.adapter.rooms.has(socket.handshake.query.apiKey as string));
-        
         //online/offline agent
         const isAvailableAgent = io.sockets.adapter.rooms.has(socket.handshake.query.apiKey as string);
         setTimeout(()=>{
@@ -180,7 +178,7 @@ io.on("connection",(socket)=>{
 
         socket.on("DingloServer-DashboardMessage",(msg)=>{
             saveMessage(msg.message,msg.connectionId,socket.handshake.query.id as string,true);
-            socket.to(msg.connectionId).emit("message_client",msg);
+            socket.to(msg.connectionId).emit("message_client",{...msg, isNew: true});
         });
         socket.on("disconnect",()=>{
             console.log("disconnect");
