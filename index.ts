@@ -108,6 +108,22 @@ async function createConversation(connectionId: string, projectApiKey: string){
         console.log(err);
     }
 }
+async function setConversationStatus(connectionId: string, status: boolean){
+    //status - true ? online:false
+    try{
+
+        await db.conversation.update({
+            where:{
+                connectionId,
+            },
+            data:{
+                online: status,
+            }
+        })
+    }catch(err){
+        console.log(err);
+    }
+}
 
 async function agentStatus(projectApiKey: string, socket: Socket, available: boolean){
     try{
@@ -180,11 +196,12 @@ io.on("connection",(socket)=>{
     if(socket.handshake.query.apiKey && socket.handshake.query.apiKey.trim()!==""){
         //client - join room
         const connectionId = socket.handshake.query.connectionId as string;
-        console.log("cid", connectionId);
-        
+        console.log("cids", connectionId);
+        setConversationStatus(connectionId, true);
+
         socket.join(connectionId);
-        
-        //check for online
+
+        //check for agent status
         setTimeout(()=>{
             checkAgentStatus(socket.handshake.query.apiKey as string, socket);
         },500);
@@ -209,7 +226,14 @@ io.on("connection",(socket)=>{
             console.log(typing);
             
             socket.to(socket.handshake.query.apiKey!).emit("DingloClient-Typing",{...typing, connectionId});
-        })
+        });
+
+        socket.on("disconnect",()=>{
+            console.log("widget cline disconnected");
+            
+            socket.to(socket.handshake.query.apiKey!).emit("DingloClient-Disconnect",connectionId);
+            setConversationStatus(connectionId, false);
+        });
 
     }else{
         //dingloUser - join room api key

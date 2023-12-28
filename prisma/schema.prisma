@@ -36,6 +36,7 @@ model Conversation {
   projectId    String
   project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   messages     Message[]
+  online       Boolean @default(true)
 }
 
 model Message {
