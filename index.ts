@@ -72,15 +72,20 @@ async function saveMessage(
 }
 
 async function getConnectionMessages(connectionId: string) {
-  const messages = await db.message.findMany({
-    where: {
-      conversationId: connectionId,
-    },
-  });
-
-  if (!messages) return [];
-
-  return messages;
+  try{
+    const messages = await db.message.findMany({
+      where: {
+        conversationId: connectionId,
+      },
+    });
+  
+    if (!messages) return [];
+  
+    return messages;
+  }catch(err){
+    return [];
+  }
+  
 }
 
 async function sendConnectionMessages(connectionId: string, socket: Socket) {
@@ -283,6 +288,8 @@ io.on("connection", async (socket) => {
 
     //check for project widget availability
     const active = await projectStatus(socket.handshake.query.apiKey as string);
+    console.log("isActive", active);
+    
     setTimeout(() => {
       socket.emit("disable_project", { isActive: active });
     }, 500);
