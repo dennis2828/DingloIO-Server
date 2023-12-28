@@ -111,6 +111,20 @@ async function createConversation(connectionId: string, projectApiKey: string){
 
 async function agentStatus(projectApiKey: string, socket: Socket, available: boolean){
     try{
+
+        const user = await db.user.findFirst({
+            where:{
+                projects: {
+                    some: {
+                      api_key:projectApiKey,
+                    },
+                },
+            }
+        });
+        
+        if(!user) return;
+
+
         const targetProject = await db.project.findUnique({
             where:{
                 api_key: projectApiKey,
@@ -125,11 +139,35 @@ async function agentStatus(projectApiKey: string, socket: Socket, available: boo
                 projectId: targetProject.id,
             },
         });
+        console.log(projectConversations);
+        
 
         if(projectConversations)
             for(const conv of projectConversations){
-                socket.to(conv.connectionId).emit("available_agent",available);
+                socket.to(conv.connectionId).emit("available_agent",{available, agentName: user.username, agentImage:"/profile.jpg"});
             }
+    }catch(err){
+        console.log(err);
+    }
+}
+
+async function checkAgentStatus(projectApiKey: string, socket: Socket){
+    try{
+        const user = await db.user.findFirst({
+            where:{
+                projects: {
+                    some: {
+                      api_key:projectApiKey,
+                    },
+                },
+            }
+        });
+
+        if(!user) return;
+        const isAvailableAgent = io.sockets.adapter.rooms.has(projectApiKey);
+
+        socket.emit("available_agent",{available: isAvailableAgent, agentName: user.username, agentImage:"/profile.jpg"});
+        
     }catch(err){
         console.log(err);
     }
@@ -146,6 +184,11 @@ io.on("connection",(socket)=>{
         
         socket.join(connectionId);
         
+        //check for online
+        setTimeout(()=>{
+            checkAgentStatus(socket.handshake.query.apiKey as string, socket);
+        },500);
+
         //send the previous messages
         setTimeout(()=>{
             // give some to socket to initialize
@@ -155,12 +198,6 @@ io.on("connection",(socket)=>{
         //emit to dashboard new connection
         createConversation(connectionId, socket.handshake.query.apiKey as string);
         socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection",connectionId);
-
-        //online/offline agent
-        const isAvailableAgent = io.sockets.adapter.rooms.has(socket.handshake.query.apiKey as string);
-        setTimeout(()=>{
-            socket.emit("available_agent",isAvailableAgent);
-        },500);
 
         socket.on("message", (message)=>{
             //save message to db
@@ -174,7 +211,9 @@ io.on("connection",(socket)=>{
         socket.join(socket.handshake.query.id!);
 
         //emit being online
-        agentStatus(socket.handshake.query.id as string, socket, true);
+        setTimeout(()=>{
+            agentStatus(socket.handshake.query.id as string, socket, true);
+        },500);
 
         socket.on("DingloServer-DashboardMessage",(msg)=>{
             saveMessage(msg.message,msg.connectionId,socket.handshake.query.id as string,true);
