@@ -206,8 +206,9 @@ io.on("connection",(socket)=>{
         });
 
         socket.on("typing",(typing)=>{
+            console.log(typing);
             
-            socket.to(socket.handshake.query.apiKey!).emit("DingloClient-Typing",typing);
+            socket.to(socket.handshake.query.apiKey!).emit("DingloClient-Typing",{...typing, connectionId});
         })
 
     }else{
