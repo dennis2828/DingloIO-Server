@@ -219,6 +219,10 @@ io.on("connection",(socket)=>{
             saveMessage(msg.message,msg.connectionId,socket.handshake.query.id as string,true);
             socket.to(msg.connectionId).emit("message_client",{...msg, isNew: true});
         });
+        socket.on("DingloServer-Typing",(typing)=>{
+            socket.to(typing.chatId).emit("typing",{isTyping: typing.isTyping});
+        })
+
         socket.on("disconnect",()=>{
             console.log("disconnect");
             agentStatus(socket.handshake.query.id as string, socket, false);
