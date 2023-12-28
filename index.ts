@@ -204,6 +204,12 @@ io.on("connection",(socket)=>{
             saveMessage(message.message,connectionId,socket.handshake.query.apiKey as string,false);
             socket.to(socket.handshake.query.apiKey!).emit("DingloClient-DashboardMessage", {...message, connectionId});
         });
+
+        socket.on("typing",(typing)=>{
+            
+            socket.to(socket.handshake.query.apiKey!).emit("DingloClient-Typing",typing);
+        })
+
     }else{
         //dingloUser - join room api key
         console.log("dinglo user", socket.handshake.query.id);
