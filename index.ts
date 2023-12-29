@@ -13,7 +13,7 @@ const io = new Server(httpServer, {
 });
 
 app.get("/", (_, res) => {
-  res.send("re");
+  res.send("res");
 });
 
 async function saveMessage(
@@ -282,14 +282,14 @@ io.on("connection", async (socket) => {
     //client - join room
     const connectionId = socket.handshake.query.connectionId as string;
     console.log("cids", connectionId);
-    setConversationStatus(connectionId, true);
 
     socket.join(connectionId);
 
     //check for project widget availability
     const active = await projectStatus(socket.handshake.query.apiKey as string);
-    console.log("isActive", active);
-    
+    console.log("isActive ", active);
+    socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection", connectionId);
+
     setTimeout(() => {
       socket.emit("disable_project", { isActive: active });
     }, 500);
@@ -306,11 +306,13 @@ io.on("connection", async (socket) => {
       }, 500);
 
       //emit to dashboard new connection
-      createConversation(connectionId, socket.handshake.query.apiKey as string);
-      socket
-        .to(socket.handshake.query.apiKey!)
-        .emit("DingloClient-NewConnection", connectionId);
+      await createConversation(connectionId, socket.handshake.query.apiKey as string);
+      setTimeout(async ()=>{
+        await setConversationStatus(connectionId, true);
+      },500);
 
+      console.log("got here after emitting");
+      
       socket.on("message", (message) => {
         //save message to the db
         saveMessage(
@@ -349,6 +351,7 @@ io.on("connection", async (socket) => {
     }, 500);
 
     socket.on("DingloServer-DashboardMessage", (msg) => {
+      
       saveMessage(
         msg.message,
         msg.connectionId,
