@@ -311,19 +311,11 @@ io.on("connection", async (socket) => {
 
       //emit to dashboard new connection
       await createConversation(connectionId, socket.handshake.query.apiKey as string);
-      setTimeout(async ()=>{
-        await setConversationStatus(connectionId, true);
-      },500);
-
+      await setConversationStatus(connectionId, true);
       
       socket.on("message", (message) => {
-        //save message to the database
-        saveMessage(
-          message.message,
-          connectionId,
-          socket.handshake.query.apiKey as string,
-          false
-        );
+        console.log("got here server",message);
+        
         socket
           .to(socket.handshake.query.apiKey!)
           .emit("DingloClient-DashboardMessage", { ...message, connectionId });
