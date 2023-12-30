@@ -27,21 +27,21 @@ model Project {
   password      String
   api_key       String         @unique
   userId        String
+  disabled      Boolean        @default(false)
   conversations Conversation[]
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  disabled      Boolean        @default(false)
 }
 
 model Conversation {
   connectionId String    @id @unique
   projectId    String
+  online       Boolean   @default(true)
   project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   messages     Message[]
-  online       Boolean @default(true)
 }
 
 model Message {
-  id             String       @id @default(uuid())
+  id             String       @id
   message        String
   isAgent        Boolean
   messagedAt     String

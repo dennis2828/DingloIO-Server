@@ -317,7 +317,7 @@ io.on("connection", async (socket) => {
 
       
       socket.on("message", (message) => {
-        //save message to the db
+        //save message to the database
         saveMessage(
           message.message,
           connectionId,
@@ -355,15 +355,9 @@ io.on("connection", async (socket) => {
 
     socket.on("DingloServer-DashboardMessage", async (msg) => {
       
-      const newMessage = await saveMessage(
-        msg.message,
-        msg.connectionId,
-        socket.handshake.query.id as string,
-        true
-      );
       socket
         .to(msg.connectionId)
-        .emit("message_client", { id:newMessage?.id, isAgent:true, message:newMessage?.message, messagedAt: newMessage?.messagedAt, isNew: true });
+        .emit("message_client", { ...msg, isNew: true });
     });
 
     socket.on("DingloServer-Typing", (typing) => {
