@@ -16,64 +16,6 @@ app.get("/", (_, res) => {
   res.send("res");
 });
 
-async function saveMessage(
-  message: string,
-  connectionId: string,
-  apiKey: string,
-  isAgent: boolean
-) {
-  //find project to update
-  const targetProject = await db.project.findUnique({
-    where: {
-      api_key: apiKey,
-    },
-  });
-  if (!targetProject) return;
-
-  const conversationExists = await db.conversation.findUnique({
-    where: {
-      connectionId,
-    },
-  });
-
-  let newMessage;
-  if (!conversationExists) {
-    //create conversation
-    await db.conversation.create({
-      data: {
-        connectionId,
-        projectId: targetProject.id,
-      },
-    });
-    newMessage=await db.message.create({
-      data: {
-        message,
-        isAgent,
-        messagedAt: new Date(Date.now()).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        conversationId: connectionId,
-      },
-    });
-  } else {
-    //update conversation
-    newMessage=await db.message.create({
-      data: {
-        message,
-        isAgent,
-        messagedAt: new Date(Date.now()).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        conversationId: connectionId,
-      },
-    });
-  }
-
-  return newMessage;
-}
-
 async function getConnectionMessages(connectionId: string) {
   try{
     const messages = await db.message.findMany({
