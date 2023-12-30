@@ -36,6 +36,7 @@ async function saveMessage(
     },
   });
 
+  let newMessage;
   if (!conversationExists) {
     //create conversation
     await db.conversation.create({
@@ -44,7 +45,7 @@ async function saveMessage(
         projectId: targetProject.id,
       },
     });
-    await db.message.create({
+    newMessage=await db.message.create({
       data: {
         message,
         isAgent,
@@ -57,7 +58,7 @@ async function saveMessage(
     });
   } else {
     //update conversation
-    await db.message.create({
+    newMessage=await db.message.create({
       data: {
         message,
         isAgent,
@@ -69,6 +70,8 @@ async function saveMessage(
       },
     });
   }
+
+  return newMessage;
 }
 
 async function getConnectionMessages(connectionId: string) {
@@ -312,7 +315,6 @@ io.on("connection", async (socket) => {
         await setConversationStatus(connectionId, true);
       },500);
 
-      console.log("got here after emitting");
       
       socket.on("message", (message) => {
         //save message to the db
@@ -351,9 +353,9 @@ io.on("connection", async (socket) => {
       agentStatus(socket.handshake.query.id as string, socket, true);
     }, 500);
 
-    socket.on("DingloServer-DashboardMessage", (msg) => {
+    socket.on("DingloServer-DashboardMessage", async (msg) => {
       
-      saveMessage(
+      const newMessage = await saveMessage(
         msg.message,
         msg.connectionId,
         socket.handshake.query.id as string,
@@ -361,7 +363,7 @@ io.on("connection", async (socket) => {
       );
       socket
         .to(msg.connectionId)
-        .emit("message_client", { ...msg, isNew: true });
+        .emit("message_client", { id:newMessage?.id, isAgent:true, message:newMessage?.message, messagedAt: newMessage?.messagedAt, isNew: true });
     });
 
     socket.on("DingloServer-Typing", (typing) => {
