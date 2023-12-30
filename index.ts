@@ -93,6 +93,7 @@ async function sendConnectionMessages(connectionId: string, socket: Socket) {
 
   for (const cn of connectionMessages) {
     socket.emit("message_client", {
+      id: cn.id,
       isAgent: cn.isAgent,
       message: cn.message,
       messagedAt: cn.messagedAt,
@@ -365,6 +366,12 @@ io.on("connection", async (socket) => {
 
     socket.on("DingloServer-Typing", (typing) => {
       socket.to(typing.chatId).emit("typing", { isTyping: typing.isTyping });
+    });
+
+    socket.on("DingloServer-DeleteMessage",(msg)=>{
+      console.log("gh",msg);
+      
+      socket.to(msg.connectionId).emit("delete_message",msg.id);
     });
 
     socket.on("disconnect", () => {
