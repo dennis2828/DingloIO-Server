@@ -235,7 +235,8 @@ io.on("connection", async (socket) => {
     const active = await projectStatus(socket.handshake.query.apiKey as string);
     console.log("isActive ", active);
     socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection", connectionId);
-
+    console.log("after emitting");
+    
     setTimeout(() => {
       socket.emit("disable_project", { isActive: active });
     }, 500);
