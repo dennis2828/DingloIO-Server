@@ -59,6 +59,7 @@ async function createConversation(connectionId: string, projectApiKey: string) {
     //check already exists
     const alreadyExists = await db.conversation.findUnique({
       where: {
+        projectId: targetProject.id,
         connectionId,
       },
     });
@@ -153,11 +154,12 @@ async function checkAgentStatus(projectApiKey: string, socket: Socket) {
     if (!user) return;
     const isAvailableAgent = io.sockets.adapter.rooms.has(projectApiKey);
 
-    socket.emit("available_agent", {
-      available: isAvailableAgent,
-      agentName: user.username,
-      agentImage: "/profile.jpg",
-    });
+    if(isAvailableAgent)
+      socket.emit("available_agent", {
+        available: isAvailableAgent,
+        agentName: user.username,
+        agentImage: "/profile.jpg",
+      });
   } catch (err) {
     console.log(err);
   }
@@ -230,28 +232,23 @@ io.on("connection", async (socket) => {
     console.log("cids", connectionId);
 
     socket.join(connectionId);
+    //emit new connection
+    socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection", connectionId);
 
     //check for project widget availability
     const active = await projectStatus(socket.handshake.query.apiKey as string);
-    console.log("isActive ", active);
-    socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection", connectionId);
-    console.log("after emitting");
     
     setTimeout(() => {
       socket.emit("disable_project", { isActive: active });
     }, 500);
+
     if (active) {
       //check for agent status
       setTimeout(() => {
         checkAgentStatus(socket.handshake.query.apiKey as string, socket);
       }, 500);
 
-      //send the previous messages
-      setTimeout(() => {
-        // give some to socket to initialize
-        sendConnectionMessages(connectionId, socket);
-      }, 500);
-
+    
       //emit to dashboard new connection
       await createConversation(connectionId, socket.handshake.query.apiKey as string);
       await setConversationStatus(connectionId, true);
@@ -261,7 +258,7 @@ io.on("connection", async (socket) => {
         
         socket
           .to(socket.handshake.query.apiKey!)
-          .emit("DingloClient-DashboardMessage", { ...message, connectionId });
+          .emit("DingloClient-DashboardMessage", { ...message, conversationId:connectionId });
       });
 
       socket.on("typing", (typing) => {
@@ -289,6 +286,7 @@ io.on("connection", async (socket) => {
     }, 500);
 
     socket.on("DingloServer-DashboardMessage", async (msg) => {
+      console.log("de pe dashbaord");
       
       socket
         .to(msg.connectionId)
