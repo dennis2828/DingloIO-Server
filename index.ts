@@ -268,10 +268,10 @@ io.on("connection", async (socket) => {
       });
 
       socket.on("disconnect", () => {
+        setConversationStatus(connectionId, false);
         socket
           .to(socket.handshake.query.apiKey!)
           .emit("DingloClient-Disconnect", connectionId);
-        setConversationStatus(connectionId, false);
       });
     }
   } else {
