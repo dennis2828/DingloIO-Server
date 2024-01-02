@@ -286,7 +286,7 @@ io.on("connection", async (socket) => {
     }, 500);
 
     socket.on("DingloServer-DashboardMessage", async (msg) => {
-      console.log("de pe dashbaord");
+      console.log("de pe dashbaord",msg);
       
       socket
         .to(msg.connectionId)
@@ -294,11 +294,12 @@ io.on("connection", async (socket) => {
     });
 
     socket.on("DingloServer-Typing", (typing) => {
-      socket.to(typing.chatId).emit("typing", { isTyping: typing.isTyping });
+      console.log("SCRIE ADMINUL", typing);
+      
+      socket.to(typing.conversationId).emit("typing", { isTyping: typing.isTyping });
     });
 
     socket.on("DingloServer-DeleteMessage",(msg)=>{
-      console.log("gh",msg);
       
       socket.to(msg.connectionId).emit("delete_message",msg.id);
     });
