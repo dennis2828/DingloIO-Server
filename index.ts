@@ -302,6 +302,11 @@ io.on("connection", async (socket) => {
       socket.to(msg.connectionId).emit("delete_message",msg.id);
     });
 
+    //refresh
+    socket.on("DingloServer-AgentChange",()=>{
+      agentStatus(socket.handshake.query.id as string, socket, true);
+    })
+
     socket.on("disconnect", () => {
       console.log("disconnect");
       agentStatus(socket.handshake.query.id as string, socket, false);
