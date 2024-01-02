@@ -142,7 +142,6 @@ async function checkAgentStatus(projectApiKey: string, socket: Socket) {
       });
       
     }
-     
   
   } catch (err) {
     setTimeout(() => {
