@@ -16,47 +16,11 @@ app.get("/", (_, res) => {
   res.send("res");
 });
 
-async function getConnectionMessages(connectionId: string) {
-  try{
-    const messages = await db.message.findMany({
-      where: {
-        conversationId: connectionId,
-      },
-    });
-  
-    if (!messages) return [];
-  
-    return messages;
-  }catch(err){
-    return [];
-  }
-  
-}
-
-async function sendConnectionMessages(connectionId: string, socket: Socket) {
-  const connectionMessages = await getConnectionMessages(connectionId);
-
-  for (const cn of connectionMessages) {
-    socket.emit("message_client", {
-      id: cn.id,
-      isAgent: cn.isAgent,
-      message: cn.message,
-      messagedAt: cn.messagedAt,
-      isNew: false,
-    });
-  }
-}
-
-async function createConversation(connectionId: string, projectApiKey: string) {
+async function createConversation(connectionId: string, projectApiKey: string, socket: Socket) {
   try {
-    const targetProject = await db.project.findUnique({
-      where: {
-        api_key: projectApiKey,
-      },
-    });
+    const targetProject = await findProject(projectApiKey);
     if (!targetProject) return;
 
-    //check already exists
     const alreadyExists = await db.conversation.findUnique({
       where: {
         projectId: targetProject.id,
@@ -108,11 +72,7 @@ async function agentStatus(
 
     if (!user) return;
 
-    const targetProject = await db.project.findUnique({
-      where: {
-        api_key: projectApiKey,
-      },
-    });
+    const targetProject = await findProject(projectApiKey);
 
     if (!targetProject) return;
 
@@ -122,7 +82,6 @@ async function agentStatus(
         projectId: targetProject.id,
       },
     });
-    console.log(projectConversations);
 
     if (projectConversations)
       for (const conv of projectConversations) {
@@ -141,11 +100,7 @@ async function agentStatus(
 
 async function checkAgentStatus(projectApiKey: string, socket: Socket) {
   try {
-    const targetProject = await db.project.findUnique({
-      where: {
-        api_key: projectApiKey,
-      },
-    });
+    const targetProject = await findProject(projectApiKey);
     if (!targetProject) return;
 
 
@@ -197,6 +152,7 @@ async function toggleProject(projectApiKey: string, socket: Socket, status: bool
 
     if (projectConversations)
       for (const conv of projectConversations) {
+    
         socket.to(conv.connectionId).emit("disable_project", { isActive: !status });
       }
       socket.emit("DingloClient-ProjectDisabled",{isDisabled: !status});
@@ -248,7 +204,7 @@ io.on("connection", async (socket) => {
 
     
       //emit to dashboard new connection
-      await createConversation(connectionId, socket.handshake.query.apiKey as string);
+      await createConversation(connectionId, socket.handshake.query.apiKey as string, socket);
       await setConversationStatus(connectionId, true);
       
       socket.on("message", (message) => {
