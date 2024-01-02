@@ -30,6 +30,9 @@ model Project {
   disabled      Boolean        @default(false)
   conversations Conversation[]
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  agentName     String
+  agentImage    String 
 }
 
 model Conversation {

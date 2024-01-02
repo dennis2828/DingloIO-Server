@@ -130,8 +130,8 @@ async function agentStatus(
           .to(conv.connectionId)
           .emit("available_agent", {
             available,
-            agentName: user.username,
-            agentImage: "/profile.jpg",
+            agentName: targetProject.agentName,
+            agentImage: targetProject.agentImage,
           });
       }
   } catch (err) {
@@ -141,24 +141,22 @@ async function agentStatus(
 
 async function checkAgentStatus(projectApiKey: string, socket: Socket) {
   try {
-    const user = await db.user.findFirst({
+    const targetProject = await db.project.findUnique({
       where: {
-        projects: {
-          some: {
-            api_key: projectApiKey,
-          },
-        },
+        api_key: projectApiKey,
       },
     });
+    if (!targetProject) return;
 
-    if (!user) return;
+
+    if (!targetProject) return;
     const isAvailableAgent = io.sockets.adapter.rooms.has(projectApiKey);
 
     if(isAvailableAgent)
       socket.emit("available_agent", {
         available: isAvailableAgent,
-        agentName: user.username,
-        agentImage: "/profile.jpg",
+        agentName: targetProject.agentName,
+        agentImage: targetProject.agentImage,
       });
   } catch (err) {
     console.log(err);
