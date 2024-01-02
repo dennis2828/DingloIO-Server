@@ -2,6 +2,7 @@ import Express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { instrument } from "@socket.io/admin-ui";
+import nodemailer from "nodemailer";
 import db from "./db";
 
 const app = Express();
@@ -16,7 +17,11 @@ app.get("/", (_, res) => {
   res.send("res");
 });
 
-async function createConversation(connectionId: string, projectApiKey: string, socket: Socket) {
+async function createConversation(
+  connectionId: string,
+  projectApiKey: string,
+  socket: Socket
+) {
   try {
     const targetProject = await findProject(projectApiKey);
     if (!targetProject) return;
@@ -35,10 +40,16 @@ async function createConversation(connectionId: string, projectApiKey: string, s
         },
       });
   } catch (err) {
-    console.log(err);
+    setTimeout(() => {
+      socket.emit("disable_project", { isActive: false });
+    }, 500);
   }
 }
-async function setConversationStatus(connectionId: string, status: boolean) {
+async function setConversationStatus(
+  connectionId: string,
+  status: boolean,
+  socket: Socket
+) {
   //status - true ? online:false
   try {
     await db.conversation.update({
@@ -50,6 +61,9 @@ async function setConversationStatus(connectionId: string, status: boolean) {
       },
     });
   } catch (err) {
+    setTimeout(() => {
+      socket.emit("disable_project", { isActive: false });
+    }, 500);
     console.log(err);
   }
 }
@@ -85,17 +99,32 @@ async function agentStatus(
 
     if (projectConversations)
       for (const conv of projectConversations) {
-        socket
-          .to(conv.connectionId)
-          .emit("available_agent", {
-            available,
-            agentName: targetProject.agentName,
-            agentImage: targetProject.agentImage,
-          });
+        socket.to(conv.connectionId).emit("available_agent", {
+          available,
+          agentName: targetProject.agentName,
+          agentImage: targetProject.agentImage,
+        });
       }
   } catch (err) {
     console.log(err);
   }
+}
+
+async function sendMailNotification(email: string, message: string) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.NODEMAILER_EMAIL,
+      pass: process.env.NODEMAILER_PASSWORD,
+    },
+  });
+  const mailOptions = {
+    from: "dingloadmindingo@gmail.com",
+    to: email,
+    subject: "New message while you are offline",
+    text:message,
+  };
+  await transporter.sendMail(mailOptions);
 }
 
 async function checkAgentStatus(projectApiKey: string, socket: Socket) {
@@ -103,17 +132,22 @@ async function checkAgentStatus(projectApiKey: string, socket: Socket) {
     const targetProject = await findProject(projectApiKey);
     if (!targetProject) return;
 
-
-    if (!targetProject) return;
     const isAvailableAgent = io.sockets.adapter.rooms.has(projectApiKey);
 
-    if(isAvailableAgent)
+    if (isAvailableAgent){
       socket.emit("available_agent", {
         available: isAvailableAgent,
         agentName: targetProject.agentName,
         agentImage: targetProject.agentImage,
       });
+      
+    }
+     
+  
   } catch (err) {
+    setTimeout(() => {
+      socket.emit("disable_project", { isActive: false });
+    }, 500);
     console.log(err);
   }
 }
@@ -132,7 +166,31 @@ async function findProject(projectApiKey: string) {
   }
 }
 
-async function toggleProject(projectApiKey: string, socket: Socket, status: boolean) {
+async function findUser(projectApiKey: string){
+  try {
+    const targetProject = await findProject(projectApiKey);
+
+    if(!targetProject) return;
+
+    const user = await db.user.findUnique({
+      where:{
+        id: targetProject.userId,
+      },
+    });
+    if(!user) return;
+
+    return user;
+
+  } catch (err) {
+    return false;
+  }
+}
+
+async function toggleProject(
+  projectApiKey: string,
+  socket: Socket,
+  status: boolean
+) {
   try {
     const targetProject = await db.project.update({
       where: {
@@ -152,11 +210,12 @@ async function toggleProject(projectApiKey: string, socket: Socket, status: bool
 
     if (projectConversations)
       for (const conv of projectConversations) {
-    
-        socket.to(conv.connectionId).emit("disable_project", { isActive: !status });
+        socket
+          .to(conv.connectionId)
+          .emit("disable_project", { isActive: !status });
       }
-      socket.emit("DingloClient-ProjectDisabled",{isDisabled: !status});
-    } catch (err) {
+    socket.emit("DingloClient-ProjectDisabled", { isDisabled: !status });
+  } catch (err) {
     return false;
   }
 }
@@ -179,19 +238,23 @@ async function projectStatus(projectApiKey: string) {
 
 io.on("connection", async (socket) => {
   console.log("new connection", socket.id, socket.handshake.query);
-  //@ts-ignore to solve .trim()
-  if (socket.handshake.query.apiKey && socket.handshake.query.apiKey.trim() !== "") {
+  if (
+    socket.handshake.query.apiKey &&
+    //@ts-ignore to solve .trim()
+    socket.handshake.query.apiKey.trim() !== ""
+  ) {
     //client - join room
     const connectionId = socket.handshake.query.connectionId as string;
     console.log("cids", connectionId);
 
     socket.join(connectionId);
     //emit new connection
-    socket.to(socket.handshake.query.apiKey!).emit("DingloClient-NewConnection", connectionId);
+    socket
+      .to(socket.handshake.query.apiKey!)
+      .emit("DingloClient-NewConnection", connectionId);
 
     //check for project widget availability
     const active = await projectStatus(socket.handshake.query.apiKey as string);
-    
     setTimeout(() => {
       socket.emit("disable_project", { isActive: active });
     }, 500);
@@ -202,17 +265,28 @@ io.on("connection", async (socket) => {
         checkAgentStatus(socket.handshake.query.apiKey as string, socket);
       }, 500);
 
-    
       //emit to dashboard new connection
-      await createConversation(connectionId, socket.handshake.query.apiKey as string, socket);
-      await setConversationStatus(connectionId, true);
-      
-      socket.on("message", (message) => {
-        console.log("got here server",message);
-        
+      await createConversation(
+        connectionId,
+        socket.handshake.query.apiKey as string,
         socket
+      );
+      await setConversationStatus(connectionId, true, socket);
+
+      socket.on("message", async (message) => {
+        const isAvailableAgent = io.sockets.adapter.rooms.has(socket.handshake.query.apiKey as string);
+        if(isAvailableAgent){
+          socket
           .to(socket.handshake.query.apiKey!)
-          .emit("DingloClient-DashboardMessage", { ...message, conversationId:connectionId });
+          .emit("DingloClient-DashboardMessage", {
+            ...message,
+            conversationId: connectionId,
+          });
+        }else{
+          const user = await findUser(socket.handshake.query.apiKey as string);
+          if(user) await sendMailNotification(user.email, message.message);
+        }
+       
       });
 
       socket.on("typing", (typing) => {
@@ -222,7 +296,7 @@ io.on("connection", async (socket) => {
       });
 
       socket.on("disconnect", () => {
-        setConversationStatus(connectionId, false);
+        setConversationStatus(connectionId, false, socket);
         socket
           .to(socket.handshake.query.apiKey!)
           .emit("DingloClient-Disconnect", connectionId);
@@ -240,39 +314,36 @@ io.on("connection", async (socket) => {
     }, 500);
 
     socket.on("DingloServer-DashboardMessage", async (msg) => {
-      console.log("de pe dashbaord",msg);
-      
       socket
         .to(msg.connectionId)
         .emit("message_client", { ...msg, isNew: true });
     });
 
     socket.on("DingloServer-Typing", (typing) => {
-      console.log("SCRIE ADMINUL", typing);
-      
-      socket.to(typing.conversationId).emit("typing", { isTyping: typing.isTyping });
+      socket
+        .to(typing.conversationId)
+        .emit("typing", { isTyping: typing.isTyping });
     });
 
-    socket.on("DingloServer-DeleteMessage",(msg)=>{
-      
-      socket.to(msg.connectionId).emit("delete_message",msg.id);
+    socket.on("DingloServer-DeleteMessage", (msg) => {
+      socket.to(msg.connectionId).emit("delete_message", msg.id);
     });
 
     //refresh
-    socket.on("DingloServer-AgentChange",()=>{
+    socket.on("DingloServer-AgentChange", () => {
       agentStatus(socket.handshake.query.id as string, socket, true);
-    })
+    });
 
     socket.on("disconnect", () => {
-      console.log("disconnect");
       agentStatus(socket.handshake.query.id as string, socket, false);
     });
 
     socket.on("DingloServer-ProjectStatus", (project) => {
-      console.log("disabliing", project);
-
-      toggleProject(socket.handshake.query.id as string, socket, !project.isDisabled);
-    
+      toggleProject(
+        socket.handshake.query.id as string,
+        socket,
+        !project.isDisabled
+      );
     });
   }
 });
