@@ -244,7 +244,6 @@ io.on("connection", async (socket) => {
   ) {
     //client - join room
     const connectionId = socket.handshake.query.connectionId as string;
-    console.log("cids", connectionId);
 
     socket.join(connectionId);
     //emit new connection
@@ -303,8 +302,6 @@ io.on("connection", async (socket) => {
     }
   } else {
     //dingloUser - join room api keys
-    console.log("dinglo user", socket.handshake.query.id);
-
     socket.join(socket.handshake.query.id!);
 
     //emit being online
@@ -348,11 +345,14 @@ io.on("connection", async (socket) => {
 });
 
 io.on("disconnect", (socket) => {
-  console.log("disconnect");
   if (socket.handshake.query.id)
     agentStatus(socket.handshake.query.id as string, socket, false);
-
-  console.log("disconnect", socket.id);
+  else{
+    setConversationStatus(socket.handshake.query.connectionId, false, socket);
+        socket
+          .to(socket.handshake.query.apiKey!)
+          .emit("DingloClient-Disconnect", socket.handshake.query.connectionId);
+  }
 });
 
 httpServer.listen(3001, () => {

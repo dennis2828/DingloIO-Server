@@ -28,11 +28,23 @@ model Project {
   api_key       String         @unique
   userId        String
   disabled      Boolean        @default(false)
-  conversations Conversation[]
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   agentName     String
   agentImage    String 
+  predefinedAnswers PredefinedAnswer[] 
+
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+}
+
+model PredefinedAnswer {
+  id String @id @default(uuid())
+  projectId String
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  question String
+  answer String
+
 }
 
 model Conversation {
