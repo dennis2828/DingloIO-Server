@@ -63,6 +63,8 @@ model Message {
   automated      Boolean  @default(false)
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [connectionId], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
 
 enum PROVIDERS {
