@@ -56,10 +56,11 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id
+  id             String       @id @default(uuid())
   message        String
   isAgent        Boolean
   messagedAt     String
+  automated      Boolean  @default(false)
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [connectionId], onDelete: Cascade)
 }

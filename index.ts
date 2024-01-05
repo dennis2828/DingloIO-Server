@@ -121,7 +121,7 @@ async function sendMailNotification(email: string, message: string) {
   const mailOptions = {
     from: "dingloadmindingo@gmail.com",
     to: email,
-    subject: "New message while you are offline",
+    subject: "Dinglo.IO - New message while you are offline",
     text:message,
   };
   await transporter.sendMail(mailOptions);
@@ -156,6 +156,9 @@ async function findProject(projectApiKey: string) {
     const targetProject = await db.project.findUnique({
       where: {
         api_key: projectApiKey,
+      },
+      include:{
+        predefinedAnswers: true,
       },
     });
 
@@ -235,6 +238,7 @@ async function projectStatus(projectApiKey: string) {
   }
 }
 
+
 io.on("connection", async (socket) => {
   console.log("new connection", socket.id, socket.handshake.query);
   if (
@@ -270,21 +274,24 @@ io.on("connection", async (socket) => {
         socket
       );
       await setConversationStatus(connectionId, true, socket);
-
+      socket.on("invalidate_query",()=>{
+        socket.to(socket.handshake.query.apiKey as string).emit("DingloClient-InvalidateQuery");
+      })
       socket.on("message", async (message) => {
         const isAvailableAgent = io.sockets.adapter.rooms.has(socket.handshake.query.apiKey as string);
-        if(isAvailableAgent){
-          socket
-          .to(socket.handshake.query.apiKey!)
-          .emit("DingloClient-DashboardMessage", {
-            ...message,
-            conversationId: connectionId,
-          });
-        }else{
+        if(!isAvailableAgent){
           const user = await findUser(socket.handshake.query.apiKey as string);
           if(user) await sendMailNotification(user.email, message.message);
+
+          return;
         }
-       
+        socket
+        .to(socket.handshake.query.apiKey!)
+        .emit("DingloClient-DashboardMessage", {
+          ...message,
+          conversationId: connectionId,
+        });
+        
       });
 
       socket.on("typing", (typing) => {
@@ -314,6 +321,10 @@ io.on("connection", async (socket) => {
         .to(msg.connectionId)
         .emit("message_client", { ...msg, isNew: true });
     });
+
+    socket.on("DingloServer-InvalidateQuery",(query)=>{
+      socket.to(query.connectionId).emit("invalidate_query");
+    })
 
     socket.on("DingloServer-Typing", (typing) => {
       socket
