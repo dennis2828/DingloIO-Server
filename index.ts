@@ -275,6 +275,7 @@ io.on("connection", async (socket) => {
       );
       await setConversationStatus(connectionId, true, socket);
       socket.on("invalidate_query",()=>{
+        
         socket.to(socket.handshake.query.apiKey as string).emit("DingloClient-InvalidateQuery");
       })
       socket.on("message", async (message) => {
