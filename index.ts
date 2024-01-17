@@ -257,6 +257,8 @@ io.on("connection", async (socket) => {
 
     //check for project widget availability
     const active = await projectStatus(socket.handshake.query.apiKey as string);
+    console.log("here",active);
+    
     setTimeout(() => {
       socket.emit("disable_project", { isActive: active });
     }, 500);
@@ -318,6 +320,8 @@ io.on("connection", async (socket) => {
     }, 500);
 
     socket.on("DingloServer-DashboardMessage", async (msg) => {
+      console.log(msg)
+      
       socket
         .to(msg.connectionId)
         .emit("message_client", { ...msg, isNew: true });
