@@ -1,4 +1,4 @@
-import Express from "express";
+ import Express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { instrument } from "@socket.io/admin-ui";
@@ -312,6 +312,8 @@ io.on("connection", async (socket) => {
     }
   } else {
     //dingloUser - join room api keys
+    console.log("admin");
+    
     socket.join(socket.handshake.query.id!);
 
     //emit being online
