@@ -4,6 +4,8 @@ import { Server, Socket } from "socket.io";
 import { instrument } from "@socket.io/admin-ui";
 import nodemailer from "nodemailer";
 import db from "./db";
+import dotenv from "dotenv";
+dotenv.config();
 
 const app = Express();
 const httpServer = createServer(app);
@@ -248,7 +250,8 @@ io.on("connection", async (socket) => {
   ) {
     //client - join room
     const connectionId = socket.handshake.query.connectionId as string;
-
+    console.log("client");
+    
     socket.join(connectionId);
     //emit new connection
     socket

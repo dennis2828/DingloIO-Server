@@ -18,6 +18,8 @@ const socket_io_1 = require("socket.io");
 const admin_ui_1 = require("@socket.io/admin-ui");
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const db_1 = __importDefault(require("./db"));
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(httpServer, {
@@ -246,6 +248,7 @@ io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
         socket.handshake.query.apiKey.trim() !== "") {
         //client - join room
         const connectionId = socket.handshake.query.connectionId;
+        console.log("client");
         socket.join(connectionId);
         //emit new connection
         socket
@@ -295,6 +298,7 @@ io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
     }
     else {
         //dingloUser - join room api keys
+        console.log("admin");
         socket.join(socket.handshake.query.id);
         //emit being online
         setTimeout(() => {
