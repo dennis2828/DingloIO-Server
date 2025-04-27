@@ -17,8 +17,11 @@ const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const admin_ui_1 = require("@socket.io/admin-ui");
 const nodemailer_1 = __importDefault(require("nodemailer"));
-const db_1 = __importDefault(require("./db"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const project_1 = require("./project");
+const agent_1 = require("./agent");
+const conversation_1 = require("./conversation");
+const user_1 = require("./user");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
@@ -30,217 +33,6 @@ const io = new socket_io_1.Server(httpServer, {
 app.get("/", (_, res) => {
     res.send("res");
 });
-function createConversation(connectionId, projectApiKey, socket) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const targetProject = yield findProject(projectApiKey);
-            if (!targetProject)
-                return;
-            const alreadyExists = yield db_1.default.conversation.findUnique({
-                where: {
-                    projectId: targetProject.id,
-                    connectionId,
-                },
-            });
-            if (!alreadyExists)
-                yield db_1.default.conversation.create({
-                    data: {
-                        connectionId: connectionId,
-                        projectId: targetProject.id,
-                    },
-                });
-        }
-        catch (err) {
-            setTimeout(() => {
-                socket.emit("disable_project", { isActive: false });
-            }, 500);
-        }
-    });
-}
-function setConversationStatus(connectionId, status, socket) {
-    return __awaiter(this, void 0, void 0, function* () {
-        //status - true ? online:false
-        try {
-            yield db_1.default.conversation.update({
-                where: {
-                    connectionId,
-                },
-                data: {
-                    online: status,
-                },
-            });
-        }
-        catch (err) {
-            setTimeout(() => {
-                socket.emit("disable_project", { isActive: false });
-            }, 500);
-            console.log(err);
-        }
-    });
-}
-function agentStatus(projectApiKey, socket, available) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const user = yield db_1.default.user.findFirst({
-                where: {
-                    projects: {
-                        some: {
-                            api_key: projectApiKey,
-                        },
-                    },
-                },
-            });
-            if (!user)
-                return;
-            const targetProject = yield findProject(projectApiKey);
-            if (!targetProject)
-                return;
-            //emit to all conversations that there is an available agent
-            const projectConversations = yield db_1.default.conversation.findMany({
-                where: {
-                    projectId: targetProject.id,
-                },
-            });
-            if (projectConversations)
-                for (const conv of projectConversations) {
-                    socket.to(conv.connectionId).emit("available_agent", {
-                        available,
-                        agentName: targetProject.agentName,
-                        agentImage: targetProject.agentImage,
-                    });
-                }
-        }
-        catch (err) {
-            console.log(err);
-        }
-    });
-}
-function sendMailNotification(email, message) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const transporter = nodemailer_1.default.createTransport({
-            service: "gmail",
-            auth: {
-                user: process.env.NODEMAILER_EMAIL,
-                pass: process.env.NODEMAILER_PASSWORD,
-            },
-        });
-        const mailOptions = {
-            from: "dingloadmindingo@gmail.com",
-            to: email,
-            subject: "Dinglo.IO - New message while you are offline",
-            text: message,
-        };
-        yield transporter.sendMail(mailOptions);
-    });
-}
-function checkAgentStatus(projectApiKey, socket) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const targetProject = yield findProject(projectApiKey);
-            if (!targetProject)
-                return;
-            const isAvailableAgent = io.sockets.adapter.rooms.has(projectApiKey);
-            if (isAvailableAgent) {
-                socket.emit("available_agent", {
-                    available: isAvailableAgent,
-                    agentName: targetProject.agentName,
-                    agentImage: targetProject.agentImage,
-                });
-            }
-        }
-        catch (err) {
-            setTimeout(() => {
-                socket.emit("disable_project", { isActive: false });
-            }, 500);
-            console.log(err);
-        }
-    });
-}
-function findProject(projectApiKey) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const targetProject = yield db_1.default.project.findUnique({
-                where: {
-                    api_key: projectApiKey,
-                },
-                include: {
-                    predefinedAnswers: true,
-                },
-            });
-            return targetProject;
-        }
-        catch (err) {
-            return false;
-        }
-    });
-}
-function findUser(projectApiKey) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const targetProject = yield findProject(projectApiKey);
-            if (!targetProject)
-                return;
-            const user = yield db_1.default.user.findUnique({
-                where: {
-                    id: targetProject.userId,
-                },
-            });
-            if (!user)
-                return;
-            return user;
-        }
-        catch (err) {
-            return false;
-        }
-    });
-}
-function toggleProject(projectApiKey, socket, status) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const targetProject = yield db_1.default.project.update({
-                where: {
-                    api_key: projectApiKey,
-                },
-                data: {
-                    disabled: status,
-                },
-            });
-            //emit to all connections
-            const projectConversations = yield db_1.default.conversation.findMany({
-                where: {
-                    projectId: targetProject.id,
-                },
-            });
-            if (projectConversations)
-                for (const conv of projectConversations) {
-                    socket
-                        .to(conv.connectionId)
-                        .emit("disable_project", { isActive: !status });
-                }
-            socket.emit("DingloClient-ProjectDisabled", { isDisabled: !status });
-        }
-        catch (err) {
-            return false;
-        }
-    });
-}
-function projectStatus(projectApiKey) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const targetProject = yield db_1.default.project.findUnique({
-                where: {
-                    api_key: projectApiKey,
-                },
-            });
-            if (!targetProject)
-                return false;
-            return !targetProject.disabled;
-        }
-        catch (err) {
-            return false;
-        }
-    });
-}
 io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
     console.log("new connection", socket.id, socket.handshake.query);
     if (socket.handshake.query.apiKey &&
@@ -255,7 +47,7 @@ io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
             .to(socket.handshake.query.apiKey)
             .emit("DingloClient-NewConnection", connectionId);
         //check for project widget availability
-        const active = yield projectStatus(socket.handshake.query.apiKey);
+        const active = yield (0, project_1.projectStatus)(socket.handshake.query.apiKey);
         console.log("here", active);
         setTimeout(() => {
             socket.emit("disable_project", { isActive: active });
@@ -263,18 +55,18 @@ io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
         if (active) {
             //check for agent status
             setTimeout(() => {
-                checkAgentStatus(socket.handshake.query.apiKey, socket);
+                (0, agent_1.checkAgentStatus)(io, socket.handshake.query.apiKey, socket);
             }, 500);
             //emit to dashboard new connection
-            yield createConversation(connectionId, socket.handshake.query.apiKey, socket);
-            yield setConversationStatus(connectionId, true, socket);
+            yield (0, conversation_1.createConversation)(connectionId, socket.handshake.query.apiKey, socket);
+            yield (0, conversation_1.setConversationStatus)(connectionId, true, socket);
             socket.on("invalidate_query", () => {
                 socket.to(socket.handshake.query.apiKey).emit("DingloClient-InvalidateQuery");
             });
             socket.on("message", (message) => __awaiter(void 0, void 0, void 0, function* () {
                 const isAvailableAgent = io.sockets.adapter.rooms.has(socket.handshake.query.apiKey);
                 if (!isAvailableAgent) {
-                    const user = yield findUser(socket.handshake.query.apiKey);
+                    const user = yield (0, user_1.findUser)(socket.handshake.query.apiKey);
                     if (user)
                         yield sendMailNotification(user.email, message.message);
                     return;
@@ -289,7 +81,7 @@ io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
                     .emit("DingloClient-Typing", Object.assign(Object.assign({}, typing), { connectionId }));
             });
             socket.on("disconnect", () => {
-                setConversationStatus(connectionId, false, socket);
+                (0, conversation_1.setConversationStatus)(connectionId, false, socket);
                 socket
                     .to(socket.handshake.query.apiKey)
                     .emit("DingloClient-Disconnect", connectionId);
@@ -302,7 +94,7 @@ io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
         socket.join(socket.handshake.query.id);
         //emit being online
         setTimeout(() => {
-            agentStatus(socket.handshake.query.id, socket, true);
+            (0, agent_1.agentStatus)(socket.handshake.query.id, socket, true);
         }, 500);
         socket.on("DingloServer-DashboardMessage", (msg) => __awaiter(void 0, void 0, void 0, function* () {
             console.log(msg);
@@ -323,21 +115,21 @@ io.on("connection", (socket) => __awaiter(void 0, void 0, void 0, function* () {
         });
         //refresh
         socket.on("DingloServer-AgentChange", () => {
-            agentStatus(socket.handshake.query.id, socket, true);
+            (0, agent_1.agentStatus)(socket.handshake.query.id, socket, true);
         });
         socket.on("disconnect", () => {
-            agentStatus(socket.handshake.query.id, socket, false);
+            (0, agent_1.agentStatus)(socket.handshake.query.id, socket, false);
         });
         socket.on("DingloServer-ProjectStatus", (project) => {
-            toggleProject(socket.handshake.query.id, socket, !project.isDisabled);
+            (0, project_1.toggleProject)(socket.handshake.query.id, socket, !project.isDisabled);
         });
     }
 }));
 io.on("disconnect", (socket) => {
     if (socket.handshake.query.id)
-        agentStatus(socket.handshake.query.id, socket, false);
+        (0, agent_1.agentStatus)(socket.handshake.query.id, socket, false);
     else {
-        setConversationStatus(socket.handshake.query.connectionId, false, socket);
+        (0, conversation_1.setConversationStatus)(socket.handshake.query.connectionId, false, socket);
         socket
             .to(socket.handshake.query.apiKey)
             .emit("DingloClient-Disconnect", socket.handshake.query.connectionId);
@@ -349,3 +141,21 @@ httpServer.listen(3001, () => {
 (0, admin_ui_1.instrument)(io, {
     auth: false,
 });
+function sendMailNotification(email, message) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const transporter = nodemailer_1.default.createTransport({
+            service: "gmail",
+            auth: {
+                user: process.env.NODEMAILER_EMAIL,
+                pass: process.env.NODEMAILER_PASSWORD,
+            },
+        });
+        const mailOptions = {
+            from: "dingloadmindingo@gmail.com",
+            to: email,
+            subject: "Dinglo.IO - New message while you are offline",
+            text: message,
+        };
+        yield transporter.sendMail(mailOptions);
+    });
+}
