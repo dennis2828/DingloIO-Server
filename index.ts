@@ -159,7 +159,7 @@ io.on("disconnect", (socket) => {
   }
 });
 
-httpServer.listen(3001, () => {
+httpServer.listen(process.env.PORT, () => {
   console.log("server is listening on port 3001");
 });
 
